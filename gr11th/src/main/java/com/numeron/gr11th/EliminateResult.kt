@@ -56,7 +56,7 @@ private fun findOrCreateEmptyFragment(manager: FragmentManager): EmptyFragment {
 fun <F : FragmentActivity> F.startActivityForResult(
         intent: Intent,
         options: Bundle? = null,
-        callback: (Intent) -> Unit): LambdaHolder<Intent> {
+        callback: (Intent) -> Unit = {}): LambdaHolder<Intent> {
     //获取一个与已有编码不重复的编码
     val requestCode = codeGenerate(resultHolder)
     //获取或创建Fragment
@@ -81,13 +81,15 @@ fun <F : FragmentActivity> F.requestPermissions(
     //查找Activity中有没有空的Fragment，如果没有则创建空的Fragment并添加到Activity中
     val emptyFragment = findOrCreateEmptyFragment(supportFragmentManager)
     //使用Fragment的requestPermissions方法申请权限并传入回调
-    return emptyFragment.requestPermissions(requestCode, *permission, onRequestDone = onRequestDone)
+    return emptyFragment.requestPermissions(requestCode, *permission) {
+        onRequestDone()
+    }
 }
 
 
 internal class EmptyFragment : Fragment() {
 
-    internal fun startActivityForResult(requestCode: Int, intent: Intent, options: Bundle? = null, callback: (data: Intent) -> Unit): LambdaHolder<Intent> {
+    internal fun startActivityForResult(requestCode: Int, intent: Intent, options: Bundle? = null, callback: (Intent) -> Unit): LambdaHolder<Intent> {
         return LambdaHolder(callback).also {
             resultHolder[requestCode] = it
             startActivityForResult(intent, requestCode, options)
@@ -98,18 +100,17 @@ internal class EmptyFragment : Fragment() {
         super.onActivityResult(requestCode, resultCode, data)
         //取出与requestCode对应的对象，然后执行与resultCode对应的回调
         resultHolder.remove(requestCode)?.let {
+            it.before()
             when (resultCode) {
                 FragmentActivity.RESULT_OK -> it.onSuccess(data ?: Intent())
                 FragmentActivity.RESULT_CANCELED -> it.onCanceled()
-                else -> it.onDefined()
+                else -> it.onDefined(data)
             }
         }
     }
 
-    internal fun requestPermissions(requestCode: Int, vararg permissions: String, onRequestDone: () -> Unit): LambdaHolder<Unit> {
-        //LambdaHolder接收的Lambda类型为 (Unit) -> Unit，而onRequestDone的类型为() -> Unit
-        //所以不能直接作为参数传递进去，使用Lambda中转一下，强迫症码农可能有点儿难受
-        return LambdaHolder<Unit> { onRequestDone() }.also {
+    internal fun requestPermissions(requestCode: Int, vararg permissions: String, onRequestDone: (Unit) -> Unit): LambdaHolder<Unit> {
+        return LambdaHolder(onRequestDone).also {
             //如果系统版本大于Android6.0并且未授予此权限，则申请权限
             if (Build.VERSION.SDK_INT > 22 && !checkPermissions(*permissions)) {
                 //将回调加入待调用Map存起来，然后申请权限
@@ -131,7 +132,7 @@ internal class EmptyFragment : Fragment() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         //取出与requestCode对应的回执记录，如果为空，则结束此方法
-        val receipt = permissionHolder.remove(requestCode) ?: return
+        val lambdaHolder = permissionHolder.remove(requestCode) ?: return
         //当有正在申请的权限未结束时，permissions和grantResults会是空的，此时为申请失败，做中断处理
         if (permissions.isEmpty() && grantResults.isEmpty()) return
         //将未授予的权限加入到一个列表中
@@ -139,7 +140,7 @@ internal class EmptyFragment : Fragment() {
             if (result != PackageManager.PERMISSION_GRANTED) permissions[index] else null
         }.let {
             //通过列表是否为空来判断权限是否授予，然后执行对应的回调
-            if (it.isEmpty()) receipt.onSuccess(Unit) else receipt.onDenied(it)
+            if (it.isEmpty()) lambdaHolder.onSuccess(Unit) else lambdaHolder.onDenied(it)
         }
     }
 

@@ -22,6 +22,15 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         button.append("　Kotlin")
+
+        startActivityForResult<JavaActivity>("name" to "Kotlin", "size" to 1024) { intent ->
+            toast("返回的数据：${intent.getStringExtra("name")}")
+        }.setOnCanceledCallback {
+            toast("取消了操作")
+        }.setOnDefinedCallback {
+            toast("自定义的动作")
+        }
+
     }
 
     override fun onClick(v: View?) {

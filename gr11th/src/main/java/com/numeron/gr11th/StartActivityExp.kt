@@ -20,7 +20,7 @@ import org.jetbrains.anko.support.v4.intentFor
 inline fun <reified F : FragmentActivity> FragmentActivity.startActivityForResult(
         vararg params: Pair<String, *>,
         options: Bundle? = null,
-        noinline callback: (Intent) -> Unit): LambdaHolder<Intent> {
+        noinline callback: (Intent) -> Unit = {}): LambdaHolder<Intent> {
     return startActivityForResult(intentFor<F>(*params), options, callback)
 }
 
@@ -37,6 +37,6 @@ inline fun <reified F : FragmentActivity> FragmentActivity.startActivityForResul
 inline fun <reified F : FragmentActivity> Fragment.startActivityForResult(
         vararg params: Pair<String, *>,
         options: Bundle? = null,
-        noinline callback: (Intent) -> Unit): LambdaHolder<Intent> {
+        noinline callback: (Intent) -> Unit = {}): LambdaHolder<Intent> {
     return requireActivity().startActivityForResult(intentFor<F>(*params), options, callback)
 }
